@@ -4,9 +4,9 @@ import requests
 import json
 import os
 import datetime
-import tempfile
 import math
 
+# Create Flask app
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
@@ -227,7 +227,6 @@ class AdvancedPromptEngine:
         elif 25 <= bmi < 30: body_category = "overweight"
         else: body_category = "obese"
 
-        # Calculate perspective distortion factor based on camera distance
         if float(camera_distance) < 2.0:
             perspective_warning = "CRITICAL: Camera distance <2m may cause significant perspective distortion."
             distortion_factor = "high"
@@ -238,53 +237,19 @@ class AdvancedPromptEngine:
             perspective_warning = "Optimal camera distance for minimal perspective distortion."
             distortion_factor = "minimal"
 
-        return f"""
-ROLE: You are an expert anthropometrist with 20+ years of experience in precise body measurement extraction from images. Your measurements must be conservative, especially for HIPS, and match real measuring tape results.
+        return f"""You are an expert anthropometrist. Extract precise body measurements from images with conservative hip estimation.
 
-MISSION: Extract measurements with maximum accuracy. AI SYSTEMATICALLY OVERESTIMATES HIP MEASUREMENTS BY 20-30% - YOU MUST COMPENSATE FOR THIS.
+SUBJECT: Height {height}cm, Weight {weight}kg, {gender}, BMI {bmi:.1f}, Camera {camera_distance}m
 
-TECHNICAL SPECIFICATIONS:
-• Subject Height: {height} cm (ABSOLUTE REFERENCE - use for scale calibration)
-• Camera Distance: {camera_distance} meters
-• Perspective Distortion Level: {distortion_factor}
-• {perspective_warning}
+CRITICAL: Hip measurements are commonly overestimated by AI. Use conservative calculations.
 
-CRITICAL HIP MEASUREMENT WARNING:
-**HIP MEASUREMENTS ARE THE #1 SOURCE OF ERROR IN AI VISION SYSTEMS**
-- AI consistently overestimates hip depth by 200-300%
-- Hip measurements from images are typically 15-25% too large
-- Real hip-to-chest ratios for men: 70-88% (NOT 100%+)
-- Real hip-to-waist ratios for men: 85-100% (NOT 110%+)
-
-CORE MEASUREMENT PRINCIPLES:
-1. **CONSERVATIVE HIP DEPTH**: Hip depth is typically 20-30% of hip width for men, 25-35% for women
-2. **REALISTIC CHEST/WAIST DEPTH**: Body depth is 40-50% of visible width for chest, 50-60% for waist
-3. **PRACTICAL MEASUREMENT LOCATIONS**: 
-   - Chest: At nipple/bust level
-   - Waist: At fullest part of torso (not narrowest natural waist)
-   - Hips: At widest point BUT remember this is mostly bone structure, not soft tissue
-4. **CONSERVATIVE HIP CALCULATION**: For hips, use π × (width + 0.5×depth) for men, π × (width + 0.6×depth) for women
-5. **VISUAL TRUTH WITH HIP SKEPTICISM**: Question any hip measurement that seems large
-
-SUBJECT PROFILE:
-- Height: {height} cm
-- Weight: {weight} kg  
-- Gender: {gender}
-- BMI: {bmi:.1f} ({body_category})
-- Clothing: {clothing_desc}
-- Camera Distance: {camera_distance} meters
-
-REQUIRED OUTPUT FORMAT:
-Provide ONLY a JSON object with these exact values:
-
+REQUIRED JSON OUTPUT:
 {{
   "analysis_metadata": {{
     "timestamp": "{datetime.datetime.now().isoformat()}",
     "camera_distance_m": {camera_distance},
     "perspective_distortion": "{distortion_factor}",
-    "scale_factor_cm_per_pixel": "CALCULATED_VALUE",
-    "measurement_accuracy_confidence": "PERCENTAGE",
-    "methodology": "conservative_hip_measurement"
+    "methodology": "conservative_measurement"
   }},
   "subject_profile": {{
     "height_cm": {height},
@@ -296,28 +261,9 @@ Provide ONLY a JSON object with these exact values:
   }},
   "measurements": {{
     "circumferences_cm": {{
-      "chest_bust": {{
-        "value": "CONSERVATIVE_MEASURED_VALUE",
-        "visible_width_cm": "FRONT_VIEW_WIDTH",
-        "estimated_depth_cm": "CONSERVATIVE_DEPTH_40_50_PERCENT", 
-        "confidence": "PERCENTAGE",
-        "method": "conservative_ellipse"
-      }},
-      "waist": {{
-        "value": "FULLEST_TORSO_MEASUREMENT",
-        "visible_width_cm": "FULLEST_TORSO_WIDTH",
-        "estimated_depth_cm": "REALISTIC_DEPTH_50_60_PERCENT",
-        "confidence": "PERCENTAGE", 
-        "method": "fullest_torso_measurement"
-      }},
-      "hips": {{
-        "value": "CONSERVATIVE_HIP_MEASUREMENT_70_88_PERCENT_OF_CHEST",
-        "visible_width_cm": "HIP_WIDTH",
-        "estimated_depth_cm": "FLAT_DEPTH_15_25_PERCENT_FOR_MEN",
-        "confidence": "PERCENTAGE",
-        "method": "conservative_hip_calculation_specialized_formula",
-        "notes": "Hip depth drastically reduced using specialized formula to prevent AI overestimation. Hip-to-chest ratio validated."
-      }}
+      "chest_bust": {{"value": "MEASURED_VALUE", "confidence": "PERCENTAGE"}},
+      "waist": {{"value": "MEASURED_VALUE", "confidence": "PERCENTAGE"}},
+      "hips": {{"value": "CONSERVATIVE_MEASURED_VALUE", "confidence": "PERCENTAGE"}}
     }},
     "linear_measurements_cm": {{
       "shoulder_width": {{"value": "MEASURED", "confidence": "PERCENTAGE"}},
@@ -328,20 +274,12 @@ Provide ONLY a JSON object with these exact values:
   }},
   "quality_assessment": {{
     "image_quality": "excellent/good/fair/poor",
-    "pose_accuracy": "excellent/good/fair/poor", 
+    "pose_accuracy": "excellent/good/fair/poor",
     "lighting_conditions": "excellent/good/fair/poor",
-    "measurement_limitations": ["LIST_ANY_LIMITATIONS"],
-    "accuracy_notes": "DETAILED_ACCURACY_ASSESSMENT_WITH_HIP_VALIDATION"
+    "measurement_limitations": ["LIST_LIMITATIONS"],
+    "accuracy_notes": "ASSESSMENT_NOTES"
   }}
-}}
-
-FINAL REMINDER: 
-- Hip measurements are the #1 source of AI measurement error
-- For men: hips should be 70-88% of chest (real data shows hips are often SMALLER than chest)
-- Your hip measurement should be around {float(height)*0.6:.0f}-{float(height)*0.7:.0f} cm for this subject
-- If your hip calculation exceeds these ranges, reduce it immediately
-- Prioritize conservative hip estimates that match real measuring tape results
-"""
+}}"""
 
 # Global instances
 measurement_corrector = MeasurementCorrector()
@@ -402,12 +340,21 @@ def health_check():
         "platform": "Vercel Serverless"
     })
 
+@app.route('/', methods=['GET'])
+def home():
+    """Home endpoint."""
+    return jsonify({
+        "message": "Body Measurement API is running",
+        "endpoints": {
+            "health": "/health",
+            "analyze": "/analyze"
+        },
+        "status": "ready"
+    })
+
 @app.route('/analyze', methods=['POST'])
 def analyze_body_measurements():
-    """
-    Main endpoint for body measurement analysis.
-    Expects multipart/form-data with images and parameters.
-    """
+    """Main endpoint for body measurement analysis."""
     try:
         # Check if images are present
         if 'front_image' not in request.files or 'side_image' not in request.files:
@@ -482,18 +429,13 @@ def analyze_body_measurements():
         )
         
         # Prepare API request to Groq
-        api_config = {
-            "url": "https://api.groq.com/openai/v1/chat/completions",
-            "model": "meta-llama/llama-4-scout-17b-16e-instruct"
-        }
-        
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
         
         payload = {
-            "model": api_config["model"],
+            "model": "meta-llama/llama-4-scout-17b-16e-instruct",
             "messages": [{
                 "role": "user", 
                 "content": [
@@ -508,7 +450,12 @@ def analyze_body_measurements():
         }
         
         # Make API request
-        response = requests.post(api_config["url"], headers=headers, json=payload, timeout=25)
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions", 
+            headers=headers, 
+            json=payload, 
+            timeout=20
+        )
         
         if response.status_code != 200:
             return jsonify({
@@ -578,10 +525,11 @@ def internal_error(e):
         'error': 'Internal server error'
     }), 500
 
-# Vercel serverless function handler
-if __name__ != '__main__':
-    # This ensures the app is properly configured for Vercel
-    handler = app
+# CRITICAL: This is the correct way to export for Vercel
+# Do not modify this section
+def handler(request):
+    return app(request.environ, lambda *args: None)
 
+# For local development
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
