@@ -1,23 +1,7 @@
 {
-  "version": 2,
   "functions": {
     "app.py": {
-      "runtime": "python3.9",
-      "maxDuration": 30
-    }
-  },
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "app.py"
-    }
-  ],
-  "env": {
-    "PYTHONPATH": "./"
-  },
-  "build": {
-    "env": {
-      "PYTHONPATH": "./"
+      "runtime": "@vercel/python"
     }
   }
 }
